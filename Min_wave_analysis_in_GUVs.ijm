@@ -16,11 +16,11 @@ Dialog.create("Min wave analysis");
 Dialog.addString("Title", getTitle());
 if (unit != "µm") {
 	Dialog.addMessage("                          Please check!!", 12, "red");
-	}
+}
 Dialog.addNumber("Set scale (µm in a pixel)", width);
 if (interval == 0) {
 	Dialog.addMessage("                          Please check!!", 12, "red");
-	}
+}
 Dialog.addNumber("Set interval (sec)", interval);
 Dialog.addNumber("Set channel (color)", 1);
 Dialog.addNumber("Set slice (z position)", 1);
@@ -75,7 +75,7 @@ for (i=0; i<N; i++) {
 	d = minOf(w, h); // Set the d (miximal diameter of the circle for searching) as smaller length of the either x or y axis
 	if (pixels > d) {
 		pixels = d;
-		}
+	}
 	roiManager("Delete");
 	
 	I = 0;
@@ -90,20 +90,20 @@ for (i=0; i<N; i++) {
 					if (I < mean * nPixels) { // calculate the weghted-intensity (total intensity) of the peripheral and rewrite the ROI with the highest value
 						I = mean * nPixels;
 						roiManager("add");
-						}
 					}
 				}
-			while (roiManager("count") > N) { // Keep the ROI with the highest intensity and delete the rest
-					roiManager("Select", N-1);
-					roiManager("Delete");
-				}
 			}
-		} else { // Skip the detection steps
+			while (roiManager("count") > N) { // Keep the ROI with the highest intensity and delete the rest
+				roiManager("Select", N-1);
+				roiManager("Delete");
+			}
+		}
+	} else { // Skip the detection steps
 		makeOval(x, y, w, h);
 		run("Area to Line");
 		roiManager("add");
-		}
 	}
+}
 Roi.remove;
 
 // Manually add or delete ROIs (here newly added ROIs must be circular lines but not circles by running the "Area to Line" command)
@@ -123,21 +123,21 @@ Dialog.addNumber("Searching range (floating calibration) (µm)", 2);
 Dialog.show();
 for (i=0; i<8; i++) {
 	answer[i] = Dialog.getCheckbox();
-	}
+}
 range = Dialog.getNumber();
 n = nSlices;
 N = roiManager("count");
 
 if (answer[3] == 1 || answer[5] == 1 || answer[6] == 1 || answer[7] == 1) {
 	dir = getDirectory("Choose a Directory");
-	}
+}
 	
 if (answer[4] == 1) { // Make arrays for floating calibration
 	X = newArray(n);
 	Y = newArray(n);
 	name = getTitle();
 	Overlay.hide;
-	}
+}
 
 if (answer[0] == 1) {
 	smoothingArray = newArray(1, 2, 4, 5, 8, 10, 20, 40);
@@ -159,13 +159,13 @@ if (answer[0] == 1) {
 	maxRatioPuls = Dialog.getNumber();
 	minRatioP2P = Dialog.getNumber();
 	maxRatioP2P = Dialog.getNumber();
-	}
+}
 
 setBatchMode("hide");
 run("Clear Results");
 if (answer[7] == 1) {
 	roiManager("save", dir+title+"_ROI.zip") // Save the set of ROIs
-	}
+}
 
 for (i=1; i<=N; i++) {
 	roiManager("select", i-1);
@@ -174,7 +174,7 @@ for (i=1; i<=N; i++) {
 	if (answer[0] == 1) { 
 		setResult("ID", i-1, title+"_"+i);
 		setResult("diameter (µm)", i-1, getValue("Height"));
-		}
+	}
 
 	// Floating calibration
 	if (answer[4] == 1) {
@@ -194,10 +194,10 @@ for (i=1; i<=N; i++) {
 						I = mean;
 						X[j-1] = X[j-2]+l; // and record the current position of x by adding the difference from previous position (same for y)
 						Y[j-1] = Y[j-2]+k;
-						}
 					}
 				}
 			}
+		}
 		Overlay.hide;
 
 		// Make a new floating-calibrated time-lapse stack
@@ -206,19 +206,19 @@ for (i=1; i<=N; i++) {
 			setSlice(j);
 			makeRectangle(X[j-1]-pixels, Y[j-1]-pixels, w+2*pixels, h+2*pixels); // Recall the calibrated position of the GUV at each time point and make a square ROI to center the GUV
 			run("Duplicate...", " "); // Duplicate the ROI, resultant image shows the GUV at the center of the image
-			}
+		}
 		selectWindow(name);
 		Roi.remove;
 		run("Images to Stack", "name=Stack title=[]"); // Make a new time-lapse stack by all duplicated images
 		
 		if (answer[5] == 1) {
 			saveAs("Tiff", dir+title+"_"+i+".tif");
-			}
+		}
 		if (answer[0] == 1 || answer[6] == 1) {
 			makeOval(pixels, pixels, w, h); // In the case of making kymograph, make a circle along with the peripheral and then make a circular line
 			run("Area to Line");
-			}
 		}
+	}
 
 	// Make kymographs
 	if (answer[0] == 1 || answer[6] == 1) {
@@ -231,9 +231,9 @@ for (i=1; i<=N; i++) {
 			if (answer[0] == 0) {
 				close(); // For kymograph
 				close(); // For straight line
-				}
 			}
 		}
+	}
 	
 	// Wave analysis
 	if (answer[0] == 1) {
@@ -247,7 +247,7 @@ for (i=1; i<=N; i++) {
 			pattern = Dialog.getRadioButton();
 			setBatchMode("hide");
 			setResult("Pattern", i-1, pattern);
-			}
+		}
 		
 		// Directionality detection
 		run("Duplicate...", "title=gx"); // Duplicate the kymograph for 5x5 sobel filtering in x and y derivative
@@ -266,8 +266,8 @@ for (i=1; i<=N; i++) {
 		for (y=0; y<h; y++) {
 			for (x=0; x<w; x++) {
 				UArray[x+(w*y)]= 180 * atan(getPixel(x, y)) / PI; // Obtain the directionality of each pixel by calculating arctan(dx/dy)
-				}
 			}
+		}
 
 		Plot.create("Histogram", "Angle [°]", "Frequency"); //put each pixel value into a histogram
 		Plot.setLimits(-90, 90, 0, w*h);
@@ -281,7 +281,7 @@ for (i=1; i<=N; i++) {
 		for (rowIndex = 0; rowIndex < nResults; rowIndex++) {
 			angle[rowIndex] = getResult("X", rowIndex);
 			frequency[rowIndex] = getResult("Y", rowIndex);
-			}
+		}
 		close("Results");
 		close("Histogram");
 		close("Result of gy");
@@ -303,8 +303,8 @@ for (i=1; i<=N; i++) {
 			if (temp > int) {
 				int = temp;
 				pos = j;
-				}
 			}
+		}
 		makeRectangle(pos, 0, 5, h);
 		run("Duplicate...", " ");
 		height = h * smoothing; // Interpolate the pixels along with time points by using smoothing factor to increase the data points for fitting
@@ -316,7 +316,7 @@ for (i=1; i<=N; i++) {
 		timepoints = Array.getSequence(lengthOf(profile)); // Fit Sin wave function to obtain all parameters
 		for (j=0; j<lengthOf(profile); j++) {
 			timepoints[j] = j * interval / smoothing;
-			}
+		}
 		Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profile);
 		R = Fit.rSquared;
 		periodRaw = Fit.p(1);
@@ -324,7 +324,7 @@ for (i=1; i<=N; i++) {
 		periodAmp = periodRaw - PI * repeat;
 		if (periodAmp > PI/2) {
 			periodAmp = PI - periodAmp;
-			}
+		}
 		period = 2 * PI / periodAmp;
 		setResult("Period (sec)", i-1, period);
 		setResult("Fitting (R^2)", i-1, R);
@@ -342,7 +342,7 @@ for (i=1; i<=N; i++) {
 		periodAmpCrop = periodRawCrop - PI * repeatCrop;
 		if (periodAmpCrop > PI/2) {
 			periodAmpCrop = PI - periodAmpCrop;
-			}
+		}
 		periodCrop = 2 * PI / periodAmpCrop;
 		setResult("Period (sec)_crop", i-1, periodCrop);
 		setResult("Fitting (R^2)_crop", i-1, RCrop);
@@ -354,26 +354,26 @@ for (i=1; i<=N; i++) {
 		if (period < maxPeriod && period > minPeriod) {
 			if (mainDirection > minAngle || mainDirection < -minAngle) {
 				decision = "travelling";
-				} else if (period/periodCrop > minRatioP2P && period/periodCrop < maxRatioP2P) {
+			} else if (period/periodCrop > minRatioP2P && period/periodCrop < maxRatioP2P) {
 				decision = "pole-to-pole";
-				} else if (period/periodCrop > minRatioPuls && period/periodCrop < maxRatioPuls) {
+			} else if (period/periodCrop > minRatioPuls && period/periodCrop < maxRatioPuls) {
 				decision = "pulsing";
-				}
 			}
-		setResult("Suggested oscillation mode", i-1, decision);
 		}
+		setResult("Suggested oscillation mode", i-1, decision);
+	}
 	
 	if (answer[4] == 1) {
 		close(); // For calibrated stack
-		}
 	}
+}
 
 close(); // For original image
 setBatchMode(false);
 
 if (answer[3] == 1) {
 	saveAs("Results", dir+title+".csv");
-	}
+}
 if (answer[2] == 0) {
-		close("Results");
-	}
+	close("Results");
+}
