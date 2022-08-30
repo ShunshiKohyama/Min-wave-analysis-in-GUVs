@@ -50,7 +50,7 @@ Stack.setFrame(frame);
 run("Duplicate...", " ");
 setAutoThreshold(type+" dark");
 run("Convert to Mask");
-run("Analyze Particles...", "size=minArea-maxArea circularity=1.00 clear include add");
+run("Analyze Particles...", "size=minArea-maxArea circularity=1.00 clear exclude add");
 close();
 roiManager("Show All with labels");
 
