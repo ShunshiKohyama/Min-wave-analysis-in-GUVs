@@ -1,8 +1,8 @@
 // Min_wave_analysis_in_GUVs
-// ImageJ macro for detection GUVs, make kymographs, and anlyze the wave patterns and periods based on fluorescent signals of Min waves inside GUVs
-// Validated only in Fiji v1.53f or later
+// ImageJ macro for detecting GUVs, making kymographs, and anlysing the wave patterns and periods based on fluorescent signals of Min waves inside GUVs
+// Validated only for Fiji v1.53f or later
 // Input: 2D or 3D-stacked time-lapse image files with fluorescently labeled (inside or membrane) GUVs
-// Resultant data sets are saved as new Tiff image files (for kymographs and time-lapse images), a CSV file (for pattern and period analysis), or a Zip file (for ROIs)
+// Resulting data sets are saved as new Tiff image files (for kymographs and time-lapse images), a CSV file (for pattern and period analysis), or a Zip file (for ROIs)
 // For detailed information: Kohyama et al, Nature Communications 2022
 //
 // Shunshi Kohyama (Max Planck Institute of Biochemistry), 2022
@@ -103,7 +103,7 @@ for (i=0; i<N; i++) {
 	}
 Roi.remove;
 
-// Manually add or delete ROIs (here newly added ROIs must be a circular lines but not circles)
+// Manually add or delete ROIs (here newly added ROIs must be circular lines but not circles by running the "Area to Line" command)
 setBatchMode("show");
 Overlay.hide;
 roiManager("show all with labels");
@@ -310,7 +310,7 @@ for (i=1; i<=N; i++) {
 		profile = getProfile();
 		close(); // For 1d line (from selected position)
 		
-		timepoints = Array.getSequence(lengthOf(profile)); // Fit Sin wave function to obtain valueables
+		timepoints = Array.getSequence(lengthOf(profile)); // Fit Sin wave function to obtain all parameters
 		for (j=0; j<lengthOf(profile); j++) {
 			timepoints[j] = j * interval / smoothing;
 			}
@@ -324,10 +324,10 @@ for (i=1; i<=N; i++) {
 			}
 		period = 2 * PI / periodAmp;
 		setResult("Period (sec)", i-1, period);
-		setResult("Fitting (r^2)", i-1, R);
+		setResult("Fitting (R^2)", i-1, R);
 		Roi.remove;
 		
-		// Repeat the same sequence but for the whole region of kymograph
+		// Repeat the same sequence but for the entire width of the kymograph
 		run("Size...", "width=1 height=height depth=1 average interpolation=Bilinear");
 		makeLine(0, 0, 0, height);
 		profileCrop = getProfile();
@@ -342,10 +342,10 @@ for (i=1; i<=N; i++) {
 			}
 		periodCrop = 2 * PI / periodAmpCrop;
 		setResult("Period (sec)_crop", i-1, periodCrop);
-		setResult("Fitting (r^2)_crop", i-1, RCrop);
+		setResult("Fitting (R^2)_crop", i-1, RCrop);
 		close(); // For straighten line
 
-		// Decision oscillation mode
+		// Suggested oscillation mode
 		setResult("Period ratio", i-1, period/periodCrop);
 		decision = "undefined";
 		if (period < maxPeriod && period > minPeriod) {
@@ -361,7 +361,7 @@ for (i=1; i<=N; i++) {
 		}
 	
 	if (answer[4] == 1) {
-		close(); // For calibrated stuck
+		close(); // For calibrated stack
 		}
 	}
 
