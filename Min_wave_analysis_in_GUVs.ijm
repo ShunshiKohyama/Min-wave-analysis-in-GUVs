@@ -28,6 +28,7 @@ Dialog.addNumber("Set frame (time point)", 1);
 Dialog.addChoice("Threshold method", methods, "Huang");
 Dialog.addNumber("Minimal diameter for detection (µm)", 10);
 Dialog.addNumber("Maximal diameter for detection (µm)", 50);
+Dialog.addCheckbox("fast mode", false);
 Dialog.show();
 title = Dialog.getString();
 scale = Dialog.getNumber();
@@ -38,9 +39,17 @@ frame = Dialog.getNumber();
 type = Dialog.getChoice();
 min = Dialog.getNumber();
 max = Dialog.getNumber();
+fast = Dialog.getCheckbox();
 minArea = PI * pow((min/2), 2);
 maxArea =  PI * pow((max/2), 2);
-run("ROI Manager...");
+if (fast == 1) {
+	if (isOpen("ROI Manager")) {
+	selectWindow("ROI Manager");
+	run("Close");
+	}
+} else {
+	run("ROI Manager...");
+}
 run("Set Scale...", "distance=1 known=scale pixel=1 unit=µm");
 
 setBatchMode(true);
@@ -50,7 +59,7 @@ Stack.setFrame(frame);
 run("Duplicate...", " ");
 setAutoThreshold(type+" dark");
 run("Convert to Mask");
-run("Analyze Particles...", "size=minArea-maxArea circularity=1.00 clear exclude add");
+run("Analyze Particles...", "size=minArea-maxArea circularity=1.00 clear include add");
 close();
 roiManager("Show All with labels");
 
