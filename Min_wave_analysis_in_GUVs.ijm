@@ -16,11 +16,11 @@ Dialog.create("Min wave analysis");
 Dialog.addString("Title", getTitle());
 if (unit != "µm") {
 	Dialog.addMessage("                          Please check!!", 12, "red");
-}
+	}
 Dialog.addNumber("Set scale (µm in a pixel)", width);
 if (interval == 0) {
 	Dialog.addMessage("                          Please check!!", 12, "red");
-}
+	}
 Dialog.addNumber("Set interval (sec)", interval);
 Dialog.addNumber("Set channel (color)", 1);
 Dialog.addNumber("Set slice (z position)", 1);
@@ -98,7 +98,7 @@ for (i=0; i<N; i++) {
 					roiManager("Delete");
 				}
 			}
-	} else { // Skip the detection steps
+		} else { // Skip the detection steps
 		makeOval(x, y, w, h);
 		run("Area to Line");
 		roiManager("add");
