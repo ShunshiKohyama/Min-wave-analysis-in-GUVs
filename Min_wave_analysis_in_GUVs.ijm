@@ -73,6 +73,9 @@ for (i=0; i<N; i++) {
 	roiManager("select", 0);
 	getSelectionBounds(x, y, w, h); // Get the boundary (starting position and size) of the selected ROI
 	d = minOf(w, h); // Set the d (miximal diameter of the circle for searching) as smaller length of the either x or y axis
+	if (pixels > d) {
+		pixels = d;
+		}
 	roiManager("Delete");
 	
 	I = 0;
