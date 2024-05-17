@@ -124,13 +124,13 @@ waitForUser("Add or delete ROIs");
 
 // Choose the actions and set searching range for floating calibration
 Dialog.create("Analyze setting");
-labels = newArray("Wave analysis", "Manual pattern detection", "Show results", "Save results (csv)", "Floating calibration", "Save calibrated stack", "Save kymographs", "Save ROIs");
-defaults = newArray(true, false, true, false, false, false, false, false);
-answer = newArray(8);
-Dialog.addCheckboxGroup(4, 2, labels, defaults);
-Dialog.addNumber("Searching range (floating calibration) (µm)", 2);
+labels = newArray("Wave analysis", "Manual pattern detection", "Show results", "Save results (csv)", "Floating calibration", "Save calibrated stack", "Save kymographs", "Save ROIs", "Wave analysis (advanced)");
+defaults = newArray(true, false, true, false, false, false, false, false, false);
+answer = newArray(9);
+Dialog.addCheckboxGroup(5, 2, labels, defaults);
+Dialog.addNumber("Searching range (floating calibration) (µm)", 0.2);
 Dialog.show();
-for (i=0; i<8; i++) {
+for (i=0; i<9; i++) {
 	answer[i] = Dialog.getCheckbox();
 }
 range = Dialog.getNumber();
@@ -148,15 +148,15 @@ if (answer[4] == 1) { // Make arrays for floating calibration
 	Overlay.hide;
 }
 
-if (answer[0] == 1) {
+if (answer[0] == 1 || answer[8] == 1) {
 	smoothingArray = newArray(1, 2, 4, 5, 8, 10, 20, 40);
 	Dialog.create("Oscillation analysis");
 	Dialog.addRadioButtonGroup("Smoothing parameter", smoothingArray, 2, 4, "10.0");
 	Dialog.addNumber("Min. period (s)", 30);
-	Dialog.addNumber("Max. period (s)", 180);
+	Dialog.addNumber("Max. period (s)", 300);
 	Dialog.addNumber("Min. Angle (°) for traveling", 5);
-	Dialog.addNumber("Min. period-ratio for pulsing", 0.9);
-	Dialog.addNumber("Max. period-ratio for pulsing", 1.1);
+	Dialog.addNumber("Min. period-ratio for pulsing", 0.8);
+	Dialog.addNumber("Max. period-ratio for pulsing", 1.2);
 	Dialog.addNumber("Min. period-ratio for pole-to-pole", 1.8);
 	Dialog.addNumber("Max. period-ratio for pole-to-pole", 2.2);
 	Dialog.show();
@@ -177,13 +177,9 @@ if (answer[7] == 1) {
 }
 
 for (i=1; i<=N; i++) {
+	showProgress(i/N);
 	roiManager("select", i-1);
-
-	// Get the ID and diameter of the selected ROI
-	if (answer[0] == 1) { 
-		setResult("ID", i-1, title+"_"+i);
-		setResult("diameter (µm)", i-1, getValue("Height"));
-	}
+	diameter = getValue("Height");
 
 	// Floating calibration
 	if (answer[4] == 1) {
@@ -230,10 +226,10 @@ for (i=1; i<=N; i++) {
 	}
 
 	// Make kymographs
-	if (answer[0] == 1 || answer[6] == 1) {
+	if (answer[0] == 1 || answer[6] == 1 || answer[8] == 1 ) {
 		run("Straighten...", "title=straight line=5 process"); // Convert the circular line into the straight line with 5 pixel thickness along with the line
 		w = getValue("Width"); // Get the length of the straightened line in pixel
-		run("Size...", "width=w height=1 depth=n average interpolation=Bilinear"); // Convert the image size into 1 pixel height (with the same width)
+		run("Size...", "width=w height=1 depth=n average interpolation=Bicubic"); // Convert the image size into 1 pixel height (with the same width)
 		run("Make Montage...", "columns=1 rows=n scale=1"); // Make a kymograph by periperal intensity (width) vs time-points (height)
 		if (answer[6] == 1) {
 			saveAs("Tiff", dir+title+"_"+i+"_kymo.tif");
@@ -245,7 +241,19 @@ for (i=1; i<=N; i++) {
 	}
 	
 	// Wave analysis
-	if (answer[0] == 1) {
+	if (answer[0] == 1 || answer[8] == 1) {
+		// Get the ID and diameter of the selected ROI
+		setResult("ID", i-1, title+"_"+i);
+		setResult("diameter (µm)", i-1, diameter);
+		
+		h = getHeight();
+		w = getWidth();
+		height = h * smoothing; // Interpolate the pixels along with time points by using smoothing factor to increase the data points for fitting
+		timepoints = Array.getSequence(height);
+		for (j=0; j<height; j++) {
+			timepoints[j] = j * interval / smoothing;
+		}
+		
 		// Manual pattern detection
 		if (answer[1] == 1) {
 			setBatchMode("show");
@@ -255,7 +263,7 @@ for (i=1; i<=N; i++) {
 			Dialog.show();
 			pattern = Dialog.getRadioButton();
 			setBatchMode("hide");
-			setResult("Pattern", i-1, pattern);
+			setResult("Pattern (manual)", i-1, pattern);
 		}
 		
 		// Directionality detection
@@ -301,8 +309,6 @@ for (i=1; i<=N; i++) {
 		setResult("Main Direction [°]", i-1, mainDirection);
 		
 		// Period detection
-		h = getHeight();
-		w = getWidth();
 		int = 0;
 		pos = 0;
 		makeRectangle(0, 0, 5, h); // Choose the most prominent position of oscillation in the kymograph and duplicate
@@ -316,16 +322,11 @@ for (i=1; i<=N; i++) {
 		}
 		makeRectangle(pos, 0, 5, h);
 		run("Duplicate...", " ");
-		height = h * smoothing; // Interpolate the pixels along with time points by using smoothing factor to increase the data points for fitting
-		run("Size...", "width=1 height=height depth=1 average interpolation=Bilinear");
+		run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
 		makeLine(0, 0, 0, height);
 		profile = getProfile();
 		close(); // For 1d line (from selected position)
 		
-		timepoints = Array.getSequence(lengthOf(profile)); // Fit Sin wave function to obtain all parameters
-		for (j=0; j<lengthOf(profile); j++) {
-			timepoints[j] = j * interval / smoothing;
-		}
 		Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profile);
 		R = Fit.rSquared;
 		periodRaw = Fit.p(1);
@@ -339,39 +340,90 @@ for (i=1; i<=N; i++) {
 		setResult("Fitting (R^2)", i-1, R);
 		Roi.remove;
 		
-		// Repeat the same sequence but for the entire width of the kymograph
-		run("Size...", "width=1 height=height depth=1 average interpolation=Bilinear");
-		makeLine(0, 0, 0, height);
-		profileCrop = getProfile();
-		close(); // For 1d line (from original kymograph)
-		Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profileCrop);
-		RCrop = Fit.rSquared;
-		periodRawCrop = Fit.p(1);
-		repeatCrop = Math.floor(periodRawCrop/PI);
-		periodAmpCrop = periodRawCrop - PI * repeatCrop;
-		if (periodAmpCrop > PI/2) {
-			periodAmpCrop = PI - periodAmpCrop;
-		}
-		periodCrop = 2 * PI / periodAmpCrop;
-		setResult("Period (sec)_crop", i-1, periodCrop);
-		setResult("Fitting (R^2)_crop", i-1, RCrop);
-		close(); // For straighten line
-
-		// Suggested oscillation mode
-		setResult("Period ratio", i-1, period/periodCrop);
-		decision = "undefined";
-		if (period < maxPeriod && period > minPeriod) {
-			if (mainDirection > minAngle || mainDirection < -minAngle) {
-				decision = "travelling";
-			} else if (period/periodCrop > minRatioP2P && period/periodCrop < maxRatioP2P) {
-				decision = "pole-to-pole";
-			} else if (period/periodCrop > minRatioPuls && period/periodCrop < maxRatioPuls) {
-				decision = "pulsing";
+		// Advanced period detection
+		if (answer[8] == 1) {
+			oscArray = newArray(w-5);
+			makeRectangle(0, 0, 5, h);
+			for (j = 0; j <= w-5; j++) {
+				Roi.move(j, 0);
+				run("Duplicate...", " ");
+				run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
+				makeLine(0, 0, 0, height);
+				profile = getProfile();
+				close(); // For 1d line (from selected position)
+				
+				Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profile);
+				R = Fit.rSquared;
+				periodRaw = Fit.p(1);
+				repeat = Math.floor(periodRaw/PI);
+				periodAmp = periodRaw - PI * repeat;
+				if (periodAmp > PI/2) {
+					periodAmp = PI - periodAmp;
+				}
+				period = 2 * PI / periodAmp;
+				if (period > maxPeriod || period < minPeriod) {
+					oscArray[j] = NaN;
+				} else {
+					oscArray[j] = period;
+				}
 			}
-		}
-		setResult("Suggested oscillation mode", i-1, decision);
-	}
+			Roi.remove;
 	
+			Plot.create("Histogram", "Period [sec]", "Frequency"); //put each pixel value into a histogram
+			Plot.setLimits(minPeriod, maxPeriod, 0, 30);
+			Plot.addHistogram(oscArray, 1);
+			Plot.show();
+			IJ.renameResults("Results","toSave");
+			selectWindow("Histogram");
+			Plot.showValues();
+			periodArray = newArray(nResults);
+			frequency = newArray(nResults);
+			for (rowIndex = 0; rowIndex < nResults; rowIndex++) {
+				periodArray[rowIndex] = getResult("X", rowIndex);
+				frequency[rowIndex] = getResult("Y", rowIndex);
+			}
+			close("Results");
+			close("Histogram");
+			Fit.doFit("Gaussian", periodArray, frequency); // Fit gausian curve to get the most prominent direction
+			mainPeriod = Fit.p(2);
+			run("Clear Results");
+			IJ.renameResults("toSave","Results");
+			setResult("Period [advanced] (sec)", i-1, mainPeriod);
+			}
+		
+			// Repeat the same sequence but for the entire width of the kymograph
+			run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
+			makeLine(0, 0, 0, height);
+			profileCrop = getProfile();
+			close(); // For 1d line (from original kymograph)
+			Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profileCrop);
+			RCrop = Fit.rSquared;
+			periodRawCrop = Fit.p(1);
+			repeatCrop = Math.floor(periodRawCrop/PI);
+			periodAmpCrop = periodRawCrop - PI * repeatCrop;
+			if (periodAmpCrop > PI/2) {
+				periodAmpCrop = PI - periodAmpCrop;
+			}
+			periodCrop = 2 * PI / periodAmpCrop;
+			setResult("Period (sec)_crop", i-1, periodCrop);
+			setResult("Fitting (R^2)_crop", i-1, RCrop);
+			close(); // For straighten line
+	
+			// Suggested oscillation mode
+			setResult("Period ratio", i-1, period/periodCrop);
+			decision = "undefined";
+			if (period < maxPeriod && period > minPeriod) {
+				if (mainDirection > minAngle || mainDirection < -minAngle) {
+					decision = "travelling";
+				} else if (period/periodCrop > minRatioP2P && period/periodCrop < maxRatioP2P) {
+					decision = "pole-to-pole";
+				} else if (period/periodCrop > minRatioPuls && period/periodCrop < maxRatioPuls) {
+					decision = "pulsing";
+				}
+			}
+			setResult("Suggested oscillation mode", i-1, decision);
+		}
+
 	if (answer[4] == 1) {
 		close(); // For calibrated stack
 	}
