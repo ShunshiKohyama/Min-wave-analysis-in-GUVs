@@ -113,11 +113,11 @@ for (i=0; i<N; i++) {
 		roiManager("add");
 	}
 }
-Roi.remove;
+run("Select None");
 
 // Manually add or delete ROIs (here newly added ROIs must be circular lines but not circles by running the "Area to Line" command)
 setBatchMode("show");
-Overlay.hide;
+run("Hide Overlay");
 roiManager("show all with labels");
 beep();
 waitForUser("Add or delete ROIs");
@@ -145,7 +145,7 @@ if (answer[4] == 1) { // Make arrays for floating calibration
 	X = newArray(n);
 	Y = newArray(n);
 	name = getTitle();
-	Overlay.hide;
+	run("Hide Overlay");
 }
 
 if (answer[0] == 1 || answer[8] == 1) {
@@ -203,7 +203,7 @@ for (i=1; i<=N; i++) {
 				}
 			}
 		}
-		Overlay.hide;
+		run("Hide Overlay");
 
 		// Make a new floating-calibrated time-lapse stack
 		for (j=1; j<=n; j++) {
@@ -213,7 +213,7 @@ for (i=1; i<=N; i++) {
 			run("Duplicate...", " "); // Duplicate the ROI, resultant image shows the GUV at the center of the image
 		}
 		selectWindow(name);
-		Roi.remove;
+		run("Select None");
 		run("Images to Stack", "name=Stack title=[]"); // Make a new time-lapse stack by all duplicated images
 		
 		if (answer[5] == 1) {
@@ -290,22 +290,11 @@ for (i=1; i<=N; i++) {
 		Plot.setLimits(-90, 90, 0, w*h);
 		Plot.addHistogram(UArray, 1, 0);
 		Plot.show();
-		IJ.renameResults("Results","toSave");
-		selectWindow("Histogram");
-		Plot.showValues();
-		angle = newArray(nResults);
-		frequency = newArray(nResults);
-		for (rowIndex = 0; rowIndex < nResults; rowIndex++) {
-			angle[rowIndex] = getResult("X", rowIndex);
-			frequency[rowIndex] = getResult("Y", rowIndex);
-		}
-		close("Results");
+		Plot.getValues(angle, frequency);
 		close("Histogram");
 		close("Result of gy");
 		Fit.doFit("Gaussian", angle, frequency); // Fit gausian curve to get the most prominent direction
 		mainDirection = Fit.p(2);
-		run("Clear Results");
-		IJ.renameResults("toSave","Results");
 		setResult("Main Direction [°]", i-1, mainDirection);
 		
 		// Period detection
@@ -323,7 +312,7 @@ for (i=1; i<=N; i++) {
 		makeRectangle(pos, 0, 5, h);
 		run("Duplicate...", " ");
 		run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
-		makeLine(0, 0, 0, height);
+		makeLine(0, 0, 0, height - 1);
 		profile = getProfile();
 		close(); // For 1d line (from selected position)
 		
@@ -338,17 +327,18 @@ for (i=1; i<=N; i++) {
 		period = 2 * PI / periodAmp;
 		setResult("Period (sec)", i-1, period);
 		setResult("Fitting (R^2)", i-1, R);
-		Roi.remove;
+		run("Select None");
 		
 		// Advanced period detection
 		if (answer[8] == 1) {
-			oscArray = newArray(w-5);
+			oscArray = newArray(w-4);
+			validCount = 0;
 			makeRectangle(0, 0, 5, h);
 			for (j = 0; j <= w-5; j++) {
 				Roi.move(j, 0);
 				run("Duplicate...", " ");
 				run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
-				makeLine(0, 0, 0, height);
+				makeLine(0, 0, 0, height - 1);
 				profile = getProfile();
 				close(); // For 1d line (from selected position)
 				
@@ -361,39 +351,32 @@ for (i=1; i<=N; i++) {
 					periodAmp = PI - periodAmp;
 				}
 				period = 2 * PI / periodAmp;
-				if (period > maxPeriod || period < minPeriod) {
-					oscArray[j] = NaN;
-				} else {
-					oscArray[j] = period;
+				if (period <= maxPeriod && period >= minPeriod) {
+					oscArray[validCount] = period;
+					validCount++;
 				}
 			}
-			Roi.remove;
+			run("Select None");
 	
-			Plot.create("Histogram", "Period [sec]", "Frequency"); //put each pixel value into a histogram
-			Plot.setLimits(minPeriod, maxPeriod, 0, 30);
-			Plot.addHistogram(oscArray, 1);
-			Plot.show();
-			IJ.renameResults("Results","toSave");
-			selectWindow("Histogram");
-			Plot.showValues();
-			periodArray = newArray(nResults);
-			frequency = newArray(nResults);
-			for (rowIndex = 0; rowIndex < nResults; rowIndex++) {
-				periodArray[rowIndex] = getResult("X", rowIndex);
-				frequency[rowIndex] = getResult("Y", rowIndex);
+			oscArray = Array.trim(oscArray, validCount);
+			if (validCount > 0) {
+				Plot.create("Histogram", "Period [sec]", "Frequency"); //put each pixel value into a histogram
+				Plot.setLimits(minPeriod, maxPeriod, 0, 30);
+				Plot.addHistogram(oscArray, 1);
+				Plot.show();
+				Plot.getValues(periodArray, frequency);
+				close("Histogram");
+				Fit.doFit("Gaussian", periodArray, frequency); // Fit gausian curve to get the most prominent direction
+				mainPeriod = Fit.p(2);
+			} else {
+				mainPeriod = NaN;
 			}
-			close("Results");
-			close("Histogram");
-			Fit.doFit("Gaussian", periodArray, frequency); // Fit gausian curve to get the most prominent direction
-			mainPeriod = Fit.p(2);
-			run("Clear Results");
-			IJ.renameResults("toSave","Results");
 			setResult("Period [advanced] (sec)", i-1, mainPeriod);
 			}
 		
 			// Repeat the same sequence but for the entire width of the kymograph
 			run("Size...", "width=1 height=height depth=1 average interpolation=Bicubic");
-			makeLine(0, 0, 0, height);
+			makeLine(0, 0, 0, height - 1);
 			profileCrop = getProfile();
 			close(); // For 1d line (from original kymograph)
 			Fit.doFit("y = a * sin(b * x + c) + d", timepoints, profileCrop);
