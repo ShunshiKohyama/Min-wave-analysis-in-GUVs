@@ -1,5 +1,5 @@
 // Min_wave_analysis_in_GUVs
-// ImageJ macro for detecting GUVs, making kymographs, and anlysing the wave patterns and periods based on fluorescent signals of Min waves inside GUVs
+// ImageJ macro for detecting GUVs, making kymographs, and analyzing the wave patterns and periods based on fluorescent signals of Min waves inside GUVs
 // Validated only for Fiji v1.53f or later
 // Input: 2D or 3D-stacked time-lapse image files with fluorescently labeled (inside or membrane) GUVs
 // Resulting data sets are saved as new Tiff image files (for kymographs and time-lapse images), a CSV file (for pattern and period analysis), or a Zip file (for ROIs)
@@ -26,9 +26,11 @@ Dialog.addNumber("Set channel (color)", 1);
 Dialog.addNumber("Set slice (z position)", 1);
 Dialog.addNumber("Set frame (time point)", 1);
 Dialog.addChoice("Threshold method", methods, "Huang");
-Dialog.addNumber("Minimal diameter for detection (µm)", 10);
+Dialog.addNumber("Minimal diameter for detection (µm)", 15);
 Dialog.addNumber("Maximal diameter for detection (µm)", 50);
-Dialog.addCheckbox("fast mode", false);
+Dialog.addNumber("Minimal circularity for detection", 0.60);
+Dialog.addNumber("Maximal circularity for detection", 1.00);
+Dialog.addCheckbox("Skip detection?", false);
 Dialog.show();
 title = Dialog.getString();
 scale = Dialog.getNumber();
@@ -39,17 +41,12 @@ frame = Dialog.getNumber();
 type = Dialog.getChoice();
 min = Dialog.getNumber();
 max = Dialog.getNumber();
-fast = Dialog.getCheckbox();
+minCirc = Dialog.getNumber();
+maxCirc = Dialog.getNumber();
 minArea = PI * pow((min/2), 2);
 maxArea =  PI * pow((max/2), 2);
-if (fast == 1) {
-	if (isOpen("ROI Manager")) {
-	selectWindow("ROI Manager");
-	run("Close");
-	}
-} else {
-	run("ROI Manager...");
-}
+skip = Dialog.getCheckbox();
+run("ROI Manager...");
 run("Set Scale...", "distance=1 known=scale pixel=1 unit=µm");
 
 setBatchMode(true);
@@ -59,20 +56,18 @@ Stack.setFrame(frame);
 run("Duplicate...", " ");
 setAutoThreshold(type+" dark");
 run("Convert to Mask");
-run("Analyze Particles...", "size=minArea-maxArea circularity=1.00 clear include add");
+run("Analyze Particles...", "size=minArea-maxArea circularity=minCirc-maxCirc clear include add");
 close();
 roiManager("Show All with labels");
 
-// Manually delete or add ROIs, the ROIs should be slightly larger circle than the target GUVs peripheral
+// Manually delete or add ROIs, the ROIs should be a slightly larger circle than the target GUVs peripheral
 setBatchMode("show");
 beep();
 waitForUser("Add or delete ROIs");
 Dialog.create("Circle detection");
 Dialog.addNumber("Searching range (um)", 5);
-Dialog.addCheckbox("Skip detection?", false);
 Dialog.show();
 range = Dialog.getNumber();
-skip = Dialog.getCheckbox();
 
 // Determine the GUVs by scanning the highest weighted-intensity profile of the peripheral
 setBatchMode("hide");
@@ -81,7 +76,7 @@ pixels = Math.ceil(range/scale);
 for (i=0; i<N; i++) {
 	roiManager("select", 0);
 	getSelectionBounds(x, y, w, h); // Get the boundary (starting position and size) of the selected ROI
-	d = minOf(w, h); // Set the d (miximal diameter of the circle for searching) as smaller length of the either x or y axis
+	d = minOf(w, h); // Set the d (minimal diameter of the circle for searching) as the smaller length of either x or y axis
 	if (pixels > d) {
 		pixels = d;
 	}
@@ -91,22 +86,23 @@ for (i=0; i<N; i++) {
 	if (skip == false) {
 		for (j=0; j<pixels; j++) {
 			makeOval(x, y, d-j, d-j); // Make the circle at top-left position inside selected ROI, the size of the ROI decreases 
-			run("Area to Line"); // convert the circle to circular line (as it is for calculation of the peripheral intensity)
+			run("Area to Line"); // convert the circle to a circular line (as it is for calculation of the peripheral intensity)
 			for (k=0; k<=h-d+j; k++) {
 				for (l=0; l<=w-d+j; l++) {
-					Roi.move(x+l, y+k); // move the circular line to the every position inside the boundary
+					Roi.move(x+l, y+k); // move the circular line to every position inside the boundary
 					getRawStatistics(nPixels, mean, min, max, std, histogram); // get the statistics of the circular line
-					if (I < mean * nPixels) { // calculate the weghted-intensity (total intensity) of the peripheral and rewrite the ROI with the highest value
+					if (I < mean * nPixels) { // calculate the weighted-intensity (total intensity) of the peripheral and rewrite the ROI with the highest value
 						I = mean * nPixels;
-						roiManager("add");
+						X = x + l;
+						Y = y + k;
+						D = d - j;						
 					}
 				}
 			}
-			while (roiManager("count") > N) { // Keep the ROI with the highest intensity and delete the rest
-				roiManager("Select", N-1);
-				roiManager("Delete");
-			}
 		}
+		makeOval(X, Y, D, D);
+		run("Area to Line");
+		roiManager("add");
 	} else { // Skip the detection steps
 		makeOval(x, y, w, h);
 		run("Area to Line");
@@ -115,14 +111,14 @@ for (i=0; i<N; i++) {
 }
 run("Select None");
 
-// Manually add or delete ROIs (here newly added ROIs must be circular lines but not circles by running the "Area to Line" command)
+// Manually add or delete ROIs (here, newly added ROIs must be circular lines, but not circles, by running the "Area to Line" command)
 setBatchMode("show");
 run("Hide Overlay");
 roiManager("show all with labels");
 beep();
 waitForUser("Add or delete ROIs");
 
-// Choose the actions and set searching range for floating calibration
+// Choose the actions and set the searching range for floating calibration
 Dialog.create("Analyze setting");
 labels = newArray("Wave analysis", "Manual pattern detection", "Show results", "Save results (csv)", "Floating calibration", "Save calibrated stack", "Save kymographs", "Save ROIs", "Wave analysis (advanced)");
 defaults = newArray(true, false, true, false, false, false, false, false, false);
@@ -220,14 +216,14 @@ for (i=1; i<=N; i++) {
 			saveAs("Tiff", dir+title+"_"+i+".tif");
 		}
 		if (answer[0] == 1 || answer[6] == 1) {
-			makeOval(pixels, pixels, w, h); // In the case of making kymograph, make a circle along with the peripheral and then make a circular line
+			makeOval(pixels, pixels, w, h); // In the case of making a kymograph, make a circle along with the peripheral and then make a circular line
 			run("Area to Line");
 		}
 	}
 
 	// Make kymographs
 	if (answer[0] == 1 || answer[6] == 1 || answer[8] == 1 ) {
-		run("Straighten...", "title=straight line=5 process"); // Convert the circular line into the straight line with 5 pixel thickness along with the line
+		run("Straighten...", "title=straight line=5 process"); // Convert the circular line into a straight line with 5 pixel thickness, along with the line
 		w = getValue("Width"); // Get the length of the straightened line in pixel
 		run("Size...", "width=w height=1 depth=n average interpolation=Bicubic"); // Convert the image size into 1 pixel height (with the same width)
 		run("Make Montage...", "columns=1 rows=n scale=1"); // Make a kymograph by periperal intensity (width) vs time-points (height)
@@ -248,7 +244,7 @@ for (i=1; i<=N; i++) {
 		
 		h = getHeight();
 		w = getWidth();
-		height = h * smoothing; // Interpolate the pixels along with time points by using smoothing factor to increase the data points for fitting
+		height = h * smoothing; // Interpolate the pixels along with time points by using a smoothing factor to increase the data points for fitting
 		timepoints = Array.getSequence(height);
 		for (j=0; j<height; j++) {
 			timepoints[j] = j * interval / smoothing;
