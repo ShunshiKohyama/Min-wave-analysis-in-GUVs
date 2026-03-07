@@ -30,7 +30,6 @@ Dialog.addNumber("Minimal diameter for detection (µm)", 15);
 Dialog.addNumber("Maximal diameter for detection (µm)", 50);
 Dialog.addNumber("Minimal circularity for detection", 0.60);
 Dialog.addNumber("Maximal circularity for detection", 1.00);
-Dialog.addCheckbox("Skip detection?", false);
 Dialog.show();
 title = Dialog.getString();
 scale = Dialog.getNumber();
@@ -45,7 +44,6 @@ minCirc = Dialog.getNumber();
 maxCirc = Dialog.getNumber();
 minArea = PI * pow((min/2), 2);
 maxArea =  PI * pow((max/2), 2);
-skip = Dialog.getCheckbox();
 run("ROI Manager...");
 run("Set Scale...", "distance=1 known=scale pixel=1 unit=µm");
 
@@ -53,24 +51,53 @@ setBatchMode(true);
 // Set target channel, slice and then duplicate, apply thresholding, and add ROIs to the ROI manager
 run("Duplicate...", "duplicate channels=channel slices=slice");
 Stack.setFrame(frame);
-run("Duplicate...", " ");
-setAutoThreshold(type+" dark");
-run("Convert to Mask");
-run("Analyze Particles...", "size=minArea-maxArea circularity=minCirc-maxCirc clear include add");
-close();
-roiManager("Show All with labels");
+
+redo = false;
+while (redo == false) {
+	run("Duplicate...", " ");
+	setAutoThreshold(type+" dark");
+	run("Convert to Mask");
+	run("Analyze Particles...", "size=minArea-maxArea circularity=minCirc-maxCirc clear include add");
+	close();
+	roiManager("Show All with labels");
+	
+	setBatchMode("show");
+	beep();
+	Dialog.create("Re-do detection?");
+	Dialog.addCheckbox("Proceed to circle fitting", true);
+	Dialog.addNumber("Searching range (um)", 5);
+	Dialog.addCheckbox("Add ROIs manually", false);
+	Dialog.addMessage("Otherwise, choose the new thresholds for detection");
+	Dialog.addChoice("Threshold method", methods, "Huang");
+	Dialog.addNumber("Minimal diameter for detection (µm)", min);
+	Dialog.addNumber("Maximal diameter for detection (µm)", max);
+	Dialog.addNumber("Minimal circularity for detection", minCirc);
+	Dialog.addNumber("Maximal circularity for detection", maxCirc);
+	Dialog.show();
+	redo = Dialog.getCheckbox();
+	range = Dialog.getNumber();
+	skip = Dialog.getCheckbox();
+	type = Dialog.getChoice();
+	min = Dialog.getNumber();
+	max = Dialog.getNumber();
+	minCirc = Dialog.getNumber();
+	maxCirc = Dialog.getNumber();
+	minArea = PI * pow((min/2), 2);
+	maxArea =  PI * pow((max/2), 2);
+	
+	run("Remove Overlay");
+	setBatchMode("hide");
+}
 
 // Manually delete or add ROIs, the ROIs should be a slightly larger circle than the target GUVs peripheral
-setBatchMode("show");
-beep();
-waitForUser("Add or delete ROIs");
-Dialog.create("Circle detection");
-Dialog.addNumber("Searching range (um)", 5);
-Dialog.show();
-range = Dialog.getNumber();
+if (skip == true) {
+	roiManager("Show All with labels");
+	setBatchMode("show");
+	waitForUser("Add or delete ROIs");
+	setBatchMode("hide");
+}
 
 // Determine the GUVs by scanning the highest weighted-intensity profile of the peripheral
-setBatchMode("hide");
 N = roiManager("count");
 pixels = Math.ceil(range/scale);
 for (i=0; i<N; i++) {
@@ -83,31 +110,25 @@ for (i=0; i<N; i++) {
 	roiManager("Delete");
 	
 	I = 0;
-	if (skip == false) {
-		for (j=0; j<pixels; j++) {
-			makeOval(x, y, d-j, d-j); // Make the circle at top-left position inside selected ROI, the size of the ROI decreases 
-			run("Area to Line"); // convert the circle to a circular line (as it is for calculation of the peripheral intensity)
-			for (k=0; k<=h-d+j; k++) {
-				for (l=0; l<=w-d+j; l++) {
-					Roi.move(x+l, y+k); // move the circular line to every position inside the boundary
-					getRawStatistics(nPixels, mean, min, max, std, histogram); // get the statistics of the circular line
-					if (I < mean * nPixels) { // calculate the weighted-intensity (total intensity) of the peripheral and rewrite the ROI with the highest value
-						I = mean * nPixels;
-						X = x + l;
-						Y = y + k;
-						D = d - j;						
-					}
+	for (j=0; j<pixels; j++) {
+		makeOval(x, y, d-j, d-j); // Make the circle at top-left position inside selected ROI, the size of the ROI decreases 
+		run("Area to Line"); // convert the circle to a circular line (as it is for calculation of the peripheral intensity)
+		for (k=0; k<=h-d+j; k++) {
+			for (l=0; l<=w-d+j; l++) {
+				Roi.move(x+l, y+k); // move the circular line to every position inside the boundary
+				getRawStatistics(nPixels, mean, min, max, std, histogram); // get the statistics of the circular line
+				if (I < mean * nPixels) { // calculate the weighted-intensity (total intensity) of the peripheral and rewrite the ROI with the highest value
+					I = mean * nPixels;
+					X = x + l;
+					Y = y + k;
+					D = d - j;						
 				}
 			}
 		}
-		makeOval(X, Y, D, D);
-		run("Area to Line");
-		roiManager("add");
-	} else { // Skip the detection steps
-		makeOval(x, y, w, h);
-		run("Area to Line");
-		roiManager("add");
 	}
+	makeOval(X, Y, D, D);
+	run("Area to Line");
+	roiManager("add");
 }
 run("Select None");
 
@@ -115,10 +136,9 @@ run("Select None");
 setBatchMode("show");
 run("Hide Overlay");
 roiManager("show all with labels");
-beep();
-waitForUser("Add or delete ROIs");
 
 // Choose the actions and set the searching range for floating calibration
+beep();
 Dialog.create("Analyze setting");
 labels = newArray("Wave analysis", "Manual pattern detection", "Show results", "Save results (csv)", "Floating calibration", "Save calibrated stack", "Save kymographs", "Save ROIs", "Wave analysis (advanced)");
 defaults = newArray(true, false, true, false, false, false, false, false, false);
