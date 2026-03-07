@@ -1,4 +1,4 @@
-// Min_wave_fast_profile
+// Min_wave_analysis_in_GUVs
 // ImageJ macro for detecting GUVs and getting the Min wave profile inside GUVs for downstream analysis
 // Validated only for Fiji v1.54p or later
 // Input: 2D or 3D-stacked time-lapse image files with fluorescently labeled (inside or membrane) GUVs
@@ -36,12 +36,12 @@ channel = Dialog.getNumber();
 slice = Dialog.getNumber();
 frame = Dialog.getNumber();
 type = Dialog.getChoice();
-min = Dialog.getNumber();
-max = Dialog.getNumber();
+minDiam = Dialog.getNumber();
+maxDiam = Dialog.getNumber();
 minCirc = Dialog.getNumber();
 maxCirc = Dialog.getNumber();
-minArea = PI * pow((min/2), 2);
-maxArea =  PI * pow((max/2), 2);
+minArea = PI * pow((minDiam/2), 2);
+maxArea =  PI * pow((maxDiam/2), 2);
 run("ROI Manager...");
 run("Set Scale...", "distance=1 known=scale pixel=1 unit=µm");
 
@@ -67,8 +67,8 @@ while (redo == false) {
 	Dialog.addCheckbox("Add ROIs manually", false);
 	Dialog.addMessage("Otherwise, choose the new thresholds for detection");
 	Dialog.addChoice("Threshold method", methods, "Huang");
-	Dialog.addNumber("Minimal diameter for detection (µm)", min);
-	Dialog.addNumber("Maximal diameter for detection (µm)", max);
+	Dialog.addNumber("Minimal diameter for detection (µm)", minDiam);
+	Dialog.addNumber("Maximal diameter for detection (µm)", maxDiam);
 	Dialog.addNumber("Minimal circularity for detection", minCirc);
 	Dialog.addNumber("Maximal circularity for detection", maxCirc);
 	Dialog.show();
@@ -76,12 +76,12 @@ while (redo == false) {
 	range = Dialog.getNumber();
 	skip = Dialog.getCheckbox();
 	type = Dialog.getChoice();
-	min = Dialog.getNumber();
-	max = Dialog.getNumber();
+	minDiam = Dialog.getNumber();
+	maxDiam = Dialog.getNumber();
 	minCirc = Dialog.getNumber();
 	maxCirc = Dialog.getNumber();
-	minArea = PI * pow((min/2), 2);
-	maxArea =  PI * pow((max/2), 2);
+	minArea = PI * pow((minDiam/2), 2);
+	maxArea =  PI * pow((maxDiam/2), 2);
 	
 	run("Remove Overlay");
 	setBatchMode("hide");
@@ -149,6 +149,17 @@ for (i = 0; i < N; i++) {
 	setResult("ID", i, Roi.getName() + ".csv");
 	setResult("diameter", i, getValue("Height"));
 }
+setResult("scale (µm)", 0, scale);
+setResult("interval (sec)", 0, interval);
+setResult("channel", 0, channel);
+setResult("slice", 0, slice);
+setResult("frame", 0, frame);
+setResult("threshold type", 0, type);
+setResult("minimal diameter for detection (µm)", 0, minDiam);
+setResult("maximal diameter for detection (µm)", 0, maxDiam);
+setResult("minimal circularity for detection", 0, minCirc);
+setResult("maximal circularity for detection", 0, maxCirc);
+
 saveAs("Results", dir + title + "_metadata.csv");
 
 for (i = 0; i < N; i++) {
