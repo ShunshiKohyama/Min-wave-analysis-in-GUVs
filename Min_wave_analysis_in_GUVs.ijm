@@ -9,11 +9,11 @@
 // Leonard Fröhlich (Max Planck Institute of Biochemistry), 2022
 
 // Set image information and target channel, slice, threshold method, and threshold values
+title = getTitle();
 methods = getList("threshold.methods");
 getVoxelSize(width, height, depth, unit);
 interval =  Stack.getFrameInterval();
 Dialog.create("Min wave analysis");
-Dialog.addString("Title", getTitle());
 if (unit != "µm") {
 	Dialog.addMessage("                          Please check!!", 12, "red");
 }
@@ -31,7 +31,6 @@ Dialog.addNumber("Maximal diameter for detection (µm)", 50);
 Dialog.addNumber("Minimal circularity for detection", 0.60);
 Dialog.addNumber("Maximal circularity for detection", 1.00);
 Dialog.show();
-title = Dialog.getString();
 scale = Dialog.getNumber();
 interval = Dialog.getNumber();
 channel = Dialog.getNumber();
@@ -151,6 +150,11 @@ n = nSlices;
 N = roiManager("count");
 
 if (answer[3] == 1 || answer[5] == 1 || answer[6] == 1 || answer[7] == 1) {
+	Dialog.create("File name");
+	Dialog.addString("Title", title);
+	Dialog.show();
+	title = Dialog.getString();
+
 	dir = getDirectory("Choose a Directory");
 }
 	
