@@ -132,12 +132,9 @@ for (i=0; i<N; i++) {
 }
 run("Select None");
 
-// Manually add or delete ROIs (here, newly added ROIs must be circular lines, but not circles, by running the "Area to Line" command)
 setBatchMode("show");
-run("Hide Overlay");
+run("Remove Overlay");
 roiManager("show all with labels");
-
-// Choose the actions and set the searching range for floating calibration
 beep();
 Dialog.create("Analyze setting");
 labels = newArray("Wave analysis", "Manual pattern detection", "Show results", "Save results (csv)", "Floating calibration", "Save calibrated stack", "Save kymographs", "Save ROIs", "Wave analysis (advanced)");
