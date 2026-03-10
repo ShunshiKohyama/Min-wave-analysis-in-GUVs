@@ -21,6 +21,7 @@ var Duplicator = Packages.ij.plugin.Duplicator;
 var OvalRoi = Packages.ij.gui.OvalRoi;
 var WaitForUserDialog = Packages.ij.gui.WaitForUserDialog;
 var DirectoryChooser = Packages.ij.io.DirectoryChooser;
+var Font = java.awt.Font;
 
 // --- Initialize Metadata and Parameters ---
 var imp = IJ.getImage();
@@ -28,16 +29,26 @@ var title = imp.getTitle();
 var cal = imp.getCalibration();
 var width = cal.pixelWidth;
 var interval = cal.frameInterval;
+var unit = cal.getUnit();
 
-var dims = imp.getDimensions(); // [width, height, nChannels, nSlices, nFrames]
+var dims = imp.getDimensions();
 var nC = dims[2]; var nZ = dims[3]; var nT = dims[4];
 
 var methodsArray = Packages.ij.process.AutoThresholder.getMethods();
 
 // --- Parameter Input ---
 var gd = new GenericDialog("Min Wave Analysis Setup");
+
+if (unit != "µm") {
+    gd.addMessage("Please check!! (Unit is not µm)", new Font("SansSerif", Font.BOLD, 12));
+}
 gd.addNumericField("Set scale (µm per pixel):", width, 4);
+
+if (interval == 0 && nT > 1) {
+    gd.addMessage("Please check!! (Frame Interval is 0)", new Font("SansSerif", Font.BOLD, 12));
+}
 gd.addNumericField("Set interval (sec):", interval, 2);
+
 gd.addNumericField("Set channel for analysis:", 1, 0);
 gd.addNumericField("Set slice (z-position):", 1, 0);
 gd.addNumericField("Set frame for detection:", 1, 0);
@@ -50,7 +61,7 @@ gd.showDialog();
 
 if (!gd.wasCanceled()) {
     var scale = gd.getNextNumber();
-    interval = gd.getNextNumber();
+    interval = Math.round(gd.getNextNumber() * 100) / 100;
     var channel = Math.min(gd.getNextNumber(), nC);
     var slice = Math.min(gd.getNextNumber(), nZ);
     var frame = Math.min(gd.getNextNumber(), nT);
@@ -78,12 +89,17 @@ if (!gd.wasCanceled()) {
 
         var maskIp = dupImp.getProcessor().duplicate();
         var maskImp = new ImagePlus("mask", maskIp);
-        IJ.setAutoThreshold(maskImp, type + " dark");
-        IJ.run(maskImp, "Convert to Mask", "");
-        rm.reset();
-        IJ.run(maskImp, "Analyze Particles...", "size=" + minArea + "-" + maxArea + " circularity=" + minCirc + "-" + maxCirc + " clear include add");
-        maskImp.close();
+        maskImp.setCalibration(dupImp.getCalibration());
         
+        Packages.ij.Prefs.blackBackground = true; 
+        IJ.setAutoThreshold(maskImp, type + " dark");
+        IJ.run(maskImp, "Convert to Mask", "background=Dark"); 
+        
+        rm.reset();
+        var analyzeCmd = "size=" + IJ.d2s(minArea,2) + "-" + IJ.d2s(maxArea,2) + " circularity=" + IJ.d2s(minCirc,2) + "-" + IJ.d2s(maxCirc,2) + " clear include add";
+        IJ.run(maskImp, "Analyze Particles...", analyzeCmd);
+        
+        maskImp.close();
         dupImp.show(); 
         IJ.selectWindow(dupID);
         rm.runCommand("Show All with labels");
@@ -116,18 +132,16 @@ if (!gd.wasCanceled()) {
         }
     }
 
-    // Manual ROI adjustment if requested
     if (skip) {
         if (dupImp.getWindow()) dupImp.getWindow().setVisible(true);
         IJ.selectWindow(dupID);
         rm.runCommand("Show All with labels");
-        new WaitForUserDialog("Manual ROI Adjustment", "Add or delete ROIs in the ROI Manager.\nClick OK when finished.").show();
+        new WaitForUserDialog("Manual ROI Adjustment", "Add or delete ROIs.\nClick OK when finished.").show();
     }
 
-    // --- Native IJM Fitting Engine ---
+    // --- Native IJM Fitting ---
     if (dupImp.getWindow()) dupImp.getWindow().setVisible(false);
     IJ.runMacro("setBatchMode(true);");
-    IJ.showStatus("Executing high-speed circle fitting...");
     
     var pixels = Math.ceil(range / scale);
     var macroCode = 
@@ -170,7 +184,6 @@ if (!gd.wasCanceled()) {
         if (!nameGD.wasCanceled()) {
             title = nameGD.getNextString();
 
-            // Export Metadata
             var rtMeta = new ResultsTable();
             var nROIs = rm.getCount();
             for (var i = 0; i < nROIs; i++) {
@@ -198,12 +211,13 @@ if (!gd.wasCanceled()) {
                     var stackIndex = (nT > 1) ? imp.getStackIndex(channel, slice, j + 1) : imp.getStackIndex(channel, j + 1, 1);
                     dummyImp.setProcessor(stack.getProcessor(stackIndex));
                     dummyImp.setRoi(roi);
-                    var straightIp = straightener.straightenLine(dummyImp, 5); // 5-pixel width average
+                    var straightIp = straightener.straightenLine(dummyImp, 5); 
                     if (straightIp) {
                         var sW = straightIp.getWidth();
+                        var currentTime = Math.round((interval * j) * 100) / 100;
                         for (var x = 0; x < sW; x++) {
                             var sum = 0; for (var y = 0; y < 5; y++) sum += straightIp.getf(x, y);
-                            rtProf.setValue(String(interval * j), x, sum / 5.0);
+                            rtProf.setValue(String(currentTime), x, sum / 5.0);
                         }
                     }
                 }
